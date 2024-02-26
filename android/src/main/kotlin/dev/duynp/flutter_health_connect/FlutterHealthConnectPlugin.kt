@@ -9,6 +9,7 @@ import androidx.health.connect.client.changes.DeletionChange
 import androidx.health.connect.client.changes.UpsertionChange
 import androidx.health.connect.client.request.ChangesTokenRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
+import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import com.fasterxml.jackson.databind.ObjectMapper
 
@@ -26,10 +27,14 @@ import java.time.temporal.ChronoUnit
 import java.util.ArrayList
 import java.util.HashMap
 import java.util.concurrent.TimeUnit
+import androidx.lifecycle.Lifecycle
+import kotlinx.coroutines.launch
+import kotlin.coroutines.CoroutineContext
 
 /** FlutterHealthConnectPlugin */
-class FlutterHealthConnectPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
+class FlutterHealthConnectPlugin : FlutterPlugin, CoroutineScope, MethodCallHandler, ActivityAware,
     PluginRegistry.ActivityResultListener {
+    private var job: Job = Job()
     var replyMapper: ObjectMapper = ObjectMapper()
     private lateinit var channel: MethodChannel
     private var permissionResult: Result? = null
@@ -229,6 +234,17 @@ class FlutterHealthConnectPlugin : FlutterPlugin, MethodCallHandler, ActivityAwa
                     result.error("UNABLE_TO_START_ACTIVITY", e.message, e)
                 }
             }
+            "aggregate" -> aggregate(call, result)
+            "disconnect" -> {
+                try {
+                    launch {
+                        client.permissionController.revokeAllPermissions()
+                        result.success(true)
+                    }
+                }catch (e: Throwable) {
+                    result.success(false)
+                }
+            }
             else -> {
                 result.notImplemented()
             }
@@ -252,5 +268,46 @@ class FlutterHealthConnectPlugin : FlutterPlugin, MethodCallHandler, ActivityAwa
             }
         }
         return false
+    }
+
+    override val coroutineContext: CoroutineContext
+        get() = Dispatchers.Main + job
+    private fun aggregate(call: MethodCall, result: Result) {
+        scope.launch {
+            try {
+                val aggregationKeys =
+                    (call.argument<ArrayList<*>>("aggregationKeys")?.filterIsInstance<String>() as ArrayList<String>?)?.toList()
+                if(aggregationKeys.isNullOrEmpty()) {
+                    result.success(LinkedHashMap<String, Any?>())
+                } else {
+                    val startTime = call.argument<String>("startTime")
+                    val endTime = call.argument<String>("endTime")
+                    val start = startTime?.let { Instant.parse(it) } ?: Instant.now()
+                        .minus(1, ChronoUnit.DAYS)
+                    val end = endTime?.let { Instant.parse(it) } ?: Instant.now()
+                    val metrics =
+                        aggregationKeys.mapNotNull { HealthConnectAggregateMetricTypeMap[it] }
+                    val response =
+                        client.aggregate(
+                            AggregateRequest(
+                                metrics.toSet(),
+                                timeRangeFilter = TimeRangeFilter.between(start, end)
+                            )
+                        )
+                    val resultData = aggregationKeys.associateBy(
+                        {it},
+                        {
+                            replyMapper.convertValue(
+                                response[HealthConnectAggregateMetricTypeMap[it]!!],
+                                Double::class.java
+                            )
+                        }
+                    )
+                    result.success(resultData)
+                }
+            } catch (e: Exception) {
+                result.error("AGGREGATE_FAIL", e.localizedMessage, e)
+            }
+        }
     }
 }

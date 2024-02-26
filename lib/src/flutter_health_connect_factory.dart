@@ -74,4 +74,28 @@ class HealthConnectFactory {
   static Future<bool> openHealthConnectSettings() async {
     return await _channel.invokeMethod('openHealthConnectSettings');
   }
+
+  static Future<Map<String, double>> aggregate({
+    required List<String> aggregationKeys,
+    required DateTime startTime,
+    required DateTime endTime,
+  }) async {
+    if (aggregationKeys.isEmpty) {
+      return {};
+    }
+    final start = startTime.toUtc().toIso8601String();
+    final end = endTime.toUtc().toIso8601String();
+    final args = <String, dynamic>{
+      'aggregationKeys': aggregationKeys,
+      'startTime': start,
+      'endTime': end,
+    };
+    return await _channel
+        .invokeMethod('aggregate', args)
+        .then((value) => Map<String, double>.from(value));
+  }
+  
+  static Future<bool> disconnect() async {
+   return await _channel.invokeMethod('disconnect');
+  }
 }

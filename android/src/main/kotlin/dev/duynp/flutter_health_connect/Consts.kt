@@ -1,5 +1,6 @@
 package dev.duynp.flutter_health_connect
 
+import androidx.health.connect.client.aggregate.AggregateMetric
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.*
 import java.time.ZoneId
@@ -101,5 +102,10 @@ fun mapTypesToPermissions(
     return permissions
 }
 
+// List of all possible records: https://developer.android.com/reference/kotlin/androidx/health/connect/client/records/package-summary
+val HealthConnectAggregateMetricTypeMap = hashMapOf<String, AggregateMetric<*>>(
+    // StepsRecord
+    "StepsRecordCountTotal" to StepsRecord.COUNT_TOTAL,
+)
 
 
