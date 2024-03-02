@@ -1,8 +1,10 @@
 package dev.duynp.flutter_health_connect
 
+import android.content.Context
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.changes.DeletionChange
@@ -12,7 +14,9 @@ import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import com.fasterxml.jackson.databind.ObjectMapper
-
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.ComponentActivity
+import io.flutter.plugin.common.PluginRegistry.Registrar
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -30,25 +34,55 @@ import java.util.concurrent.TimeUnit
 import androidx.lifecycle.Lifecycle
 import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
+import android.os.Handler
 
 /** FlutterHealthConnectPlugin */
-class FlutterHealthConnectPlugin : FlutterPlugin, CoroutineScope, MethodCallHandler, ActivityAware,
-    PluginRegistry.ActivityResultListener {
+public class FlutterHealthConnectPlugin(private var channel: MethodChannel? = null) : FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegistry.ActivityResultListener, Result {
     private var job: Job = Job()
     var replyMapper: ObjectMapper = ObjectMapper()
-    private lateinit var channel: MethodChannel
     private var permissionResult: Result? = null
     private lateinit var client: HealthConnectClient
+    private var healthConnectRequestPermissionsLauncher:  ActivityResultLauncher<Set<String>>? = null
     private var currentActivity: Activity? = null
     lateinit var scope: CoroutineScope
+    private var handler: Handler? = null
+    private lateinit var context: Context
+
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
+        Log.e("FLUTTER_HEALTH_CONNECT","onAttachedToEngine")
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "flutter_health_connect")
-        channel.setMethodCallHandler(this)
+        channel?.setMethodCallHandler(this)
+        context = flutterPluginBinding.applicationContext
         client = HealthConnectClient.getOrCreate(flutterPluginBinding.applicationContext)
     }
 
+     companion object {
+        @JvmStatic
+        fun registerWith(registrar: Registrar) {
+            val channel = MethodChannel(registrar.messenger(), "flutter_health_connect")
+            val plugin = FlutterHealthConnectPlugin(channel)
+            registrar.addActivityResultListener(plugin)
+            channel.setMethodCallHandler(plugin)
+        }
+    }
+
+    override fun success(p0: Any?) {
+        handler?.post { permissionResult?.success(p0) }
+    }
+
+    override fun notImplemented() {
+        handler?.post { permissionResult?.notImplemented() }
+    }
+
+    override fun error(
+        errorCode: String,
+        errorMessage: String?,
+        errorDetails: Any?,
+    ) {
+        handler?.post { permissionResult?.error(errorCode, errorMessage, errorDetails) }
+    }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         scope.cancel()
@@ -56,21 +90,46 @@ class FlutterHealthConnectPlugin : FlutterPlugin, CoroutineScope, MethodCallHand
     }
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
-        currentActivity = binding.activity
+        Log.e("FLUTTER_HEALTH_CONNECT","onAttachedToActivity")
+
+        if (channel == null) {
+            return
+        }
+
         binding.addActivityResultListener(this)
+        currentActivity = binding.activity
+        
+        val requestPermissionActivityContract = PermissionController.createRequestPermissionResultContract()
+
+        healthConnectRequestPermissionsLauncher =(currentActivity as ComponentActivity).registerForActivityResult(requestPermissionActivityContract) { granted ->
+            onHealthConnectPermissionCallback(granted);
+        }
+    }
+
+   
+    private  fun onHealthConnectPermissionCallback(permissionGranted: Set<String>)
+    {
+        if(permissionGranted.isEmpty()) {
+            permissionResult?.success(false);
+            Log.i("FLUTTER_HEALTH_CONNECT", "Access Denied (to Health Connect)!")
+        }else {
+            permissionResult?.success(true);
+            Log.i("FLUTTER_HEALTH_CONNECT", "Access Granted (to Health Connect)!")
+        }
     }
 
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
-        currentActivity = binding.activity
-        binding.addActivityResultListener(this)
+        Log.e("FLUTTER_HEALTH_CONNECT","onReattachedToActivityForConfigChanges")
+        onAttachedToActivity(binding)
     }
 
     override fun onDetachedFromActivityForConfigChanges() {
-        currentActivity = null;
+        onDetachedFromActivity();
     }
 
     override fun onDetachedFromActivity() {
         currentActivity = null;
+        healthConnectRequestPermissionsLauncher = null;
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
@@ -84,11 +143,11 @@ class FlutterHealthConnectPlugin : FlutterPlugin, CoroutineScope, MethodCallHand
         when (call.method) {
 
             "isApiSupported" -> {
-                result.success(HealthConnectClient.sdkStatus(activityContext) != HealthConnectClient.SDK_UNAVAILABLE)
+                result.success(HealthConnectClient.getSdkStatus(activityContext) != HealthConnectClient.SDK_UNAVAILABLE)
             }
 
             "isAvailable" -> {
-                result.success(HealthConnectClient.sdkStatus(activityContext) == HealthConnectClient.SDK_AVAILABLE)
+                result.success(HealthConnectClient.getSdkStatus(activityContext) == HealthConnectClient.SDK_AVAILABLE)
             }
 
             "installHealthConnect" -> {
@@ -125,9 +184,13 @@ class FlutterHealthConnectPlugin : FlutterPlugin, CoroutineScope, MethodCallHand
                         requestedTypes,
                         isReadOnly
                     )
-                    val contract = PermissionController.createRequestPermissionResultContract()
-                    val intent = contract.createIntent(activityContext, allPermissions)
-                    activityContext.startActivityForResult(intent, HEALTH_CONNECT_RESULT_CODE)
+
+                    if(healthConnectRequestPermissionsLauncher == null) {
+                        result.success(false)
+                        Log.e("FLUTTER_HEALTH_CONNECT", "Permission launcher not found")
+                        return;
+                    }
+                    healthConnectRequestPermissionsLauncher!!.launch(allPermissions.toSet());
                 } catch (e: Throwable) {
                     result.error("UNABLE_TO_START_ACTIVITY", e.message, e)
                 }
@@ -237,7 +300,7 @@ class FlutterHealthConnectPlugin : FlutterPlugin, CoroutineScope, MethodCallHand
             "aggregate" -> aggregate(call, result)
             "disconnect" -> {
                 try {
-                    launch {
+                    scope.launch {
                         client.permissionController.revokeAllPermissions()
                         result.success(true)
                     }
@@ -269,9 +332,7 @@ class FlutterHealthConnectPlugin : FlutterPlugin, CoroutineScope, MethodCallHand
         }
         return false
     }
-
-    override val coroutineContext: CoroutineContext
-        get() = Dispatchers.Main + job
+    
     private fun aggregate(call: MethodCall, result: Result) {
         scope.launch {
             try {

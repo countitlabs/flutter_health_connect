@@ -25,7 +25,7 @@ apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
 android {
-    compileSdkVersion 33
+    compileSdkVersion 34
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -47,7 +47,9 @@ android {
 
 dependencies {
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4'
-    implementation "androidx.health.connect:connect-client:1.0.0-alpha11"
+    implementation "androidx.health.connect:connect-client:1.1.0-alpha06"
     implementation "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.11.1'
+    def fragment_version = "1.6.2"
+    implementation "androidx.fragment:fragment-ktx:$fragment_version"
 }
