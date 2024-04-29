@@ -68,7 +68,7 @@ class HealthConnectFactory {
     };
     return await _channel
         .invokeMethod('getRecord', args)
-        .then((value) => Map<String, Object>.from(value));
+        .then((value) => Map<String, Object?>.from(value));
   }
 
   static Future<bool> openHealthConnectSettings() async {

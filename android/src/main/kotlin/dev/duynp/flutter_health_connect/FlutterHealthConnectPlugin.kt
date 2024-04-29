@@ -56,9 +56,11 @@ public class FlutterHealthConnectPlugin(private var channel: MethodChannel? = nu
         channel?.setMethodCallHandler(this)
         context = flutterPluginBinding.applicationContext
         client = HealthConnectClient.getOrCreate(flutterPluginBinding.applicationContext)
+        checkAvailability()
     }
 
      companion object {
+        @Suppress("unused")
         @JvmStatic
         fun registerWith(registrar: Registrar) {
             val channel = MethodChannel(registrar.messenger(), "flutter_health_connect")
@@ -132,26 +134,39 @@ public class FlutterHealthConnectPlugin(private var channel: MethodChannel? = nu
         healthConnectRequestPermissionsLauncher = null;
     }
 
+    var healthConnectStatus = HealthConnectClient.SDK_UNAVAILABLE
+
+    var healthConnectAvailable = false
+    var healthConnectApiSupported = false
+
+    fun checkAvailability() {
+        healthConnectStatus = HealthConnectClient.getSdkStatus(context!!)
+        healthConnectAvailable = healthConnectStatus == HealthConnectClient.SDK_AVAILABLE
+        healthConnectApiSupported = healthConnectStatus != HealthConnectClient.SDK_UNAVAILABLE
+    }
+
     override fun onMethodCall(call: MethodCall, result: Result) {
+
+
         val activityContext = currentActivity
-        if (activityContext == null) {
-            result.error("NO_ACTIVITY", "No activity available", null)
-            return
-        }
         val args = call.arguments?.let { it as? HashMap<*, *> } ?: hashMapOf<String, Any>()
         val requestedTypes = (args["types"] as? ArrayList<*>)?.filterIsInstance<String>()
         when (call.method) {
 
             "isApiSupported" -> {
-                result.success(HealthConnectClient.getSdkStatus(activityContext) != HealthConnectClient.SDK_UNAVAILABLE)
+                result.success(healthConnectApiSupported)
             }
 
             "isAvailable" -> {
-                result.success(HealthConnectClient.getSdkStatus(activityContext) == HealthConnectClient.SDK_AVAILABLE)
+                result.success(healthConnectAvailable)
             }
 
             "installHealthConnect" -> {
                 try {
+                    if(activityContext == null){
+                        result.error("NO_ACTIVITY", "No activity available", null)
+                        return
+                    }
                     activityContext.startActivity(
                         Intent(Intent.ACTION_VIEW).apply {
                             setPackage("com.android.vending")
@@ -289,6 +304,10 @@ public class FlutterHealthConnectPlugin(private var channel: MethodChannel? = nu
             }
             "openHealthConnectSettings" -> {
                 try {
+                    if(activityContext == null){
+                        result.error("NO_ACTIVITY", "No activity available", null)
+                        return
+                    }
                     val intent = Intent()
                     intent.action = HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS
                     activityContext.startActivity(intent)

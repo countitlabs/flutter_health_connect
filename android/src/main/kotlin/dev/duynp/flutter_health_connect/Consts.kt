@@ -81,7 +81,7 @@ val HealthConnectRecordTypeMap = hashMapOf(
     WheelchairPushes to WheelchairPushesRecord::class,
 )
 const val HEALTH_CONNECT_RESULT_CODE = 16969
-const val MAX_LENGTH = 9999999
+const val MAX_LENGTH = 5000
 
 fun mapTypesToPermissions(
     types: List<String>?,
