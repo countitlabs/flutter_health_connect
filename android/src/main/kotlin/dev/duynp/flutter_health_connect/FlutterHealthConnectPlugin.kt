@@ -177,6 +177,7 @@ public class FlutterHealthConnectPlugin(private var channel: MethodChannel? = nu
                         })
                     result.success(true)
                 } catch (e: Throwable) {
+                    Log.e("FLUTTER_HEALTH_CONNECT", "Error starting Health Connect", e)
                     result.error("UNABLE_TO_START_ACTIVITY", e.message, e)
                 }
             }
@@ -207,6 +208,7 @@ public class FlutterHealthConnectPlugin(private var channel: MethodChannel? = nu
                     }
                     healthConnectRequestPermissionsLauncher!!.launch(allPermissions.toSet());
                 } catch (e: Throwable) {
+                    Log.e("FLUTTER_HEALTH_CONNECT", "Error requesting permissions", e)
                     result.error("UNABLE_TO_START_ACTIVITY", e.message, e)
                 }
             }
@@ -243,6 +245,7 @@ public class FlutterHealthConnectPlugin(private var channel: MethodChannel? = nu
                         reply["changes"] = typedChanges
                         result.success(reply)
                     } catch (e: Throwable) {
+                        Log.e("FLUTTER_HEALTH_CONNECT", "Error getting changes", e)
                         result.error("GET_CHANGES_FAIL", e.localizedMessage, e)
                     }
                 }
@@ -263,6 +266,7 @@ public class FlutterHealthConnectPlugin(private var channel: MethodChannel? = nu
                             )
                         )
                     } catch (e: Throwable) {
+                        Log.e("FLUTTER_HEALTH_CONNECT", "Error getting changes token", e)
                         result.error("GET_CHANGES_TOKEN_FAIL", e.localizedMessage, e)
                     }
                 }
@@ -298,6 +302,7 @@ public class FlutterHealthConnectPlugin(private var channel: MethodChannel? = nu
                             )
                         } ?: throw Throwable("Unsupported type $type")
                     } catch (e: Throwable) {
+                        Log.e("FLUTTER_HEALTH_CONNECT", "Error getting record", e)
                         result.error("GET_RECORD_FAIL", e.localizedMessage, e)
                     }
                 }
@@ -313,6 +318,7 @@ public class FlutterHealthConnectPlugin(private var channel: MethodChannel? = nu
                     activityContext.startActivity(intent)
                     result.success(true)
                 } catch (e: Throwable) {
+                    Log.e("FLUTTER_HEALTH_CONNECT", "Error opening Health Connect settings", e)
                     result.error("UNABLE_TO_START_ACTIVITY", e.message, e)
                 }
             }
@@ -324,6 +330,7 @@ public class FlutterHealthConnectPlugin(private var channel: MethodChannel? = nu
                         result.success(true)
                     }
                 }catch (e: Throwable) {
+                    Log.e("FLUTTER_HEALTH_CONNECT", "Error disconnecting", e)
                     result.success(false)
                 }
             }
