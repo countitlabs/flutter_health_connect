@@ -48,9 +48,9 @@ android {
 
 dependencies {
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4'
-    implementation "androidx.health.connect:connect-client:1.1.0-alpha08"
-    implementation "androidx.health.connect:connect-client-external-protobuf:1.1.0-alpha08"
-    implementation "androidx.health.connect:connect-client-proto:1.1.0-alpha08"
+    implementation "androidx.health.connect:connect-client:1.1.0-rc03"
+    implementation "androidx.health.connect:connect-client-external-protobuf:1.1.0-rc03"
+    implementation "androidx.health.connect:connect-client-proto:1.1.0-rc03"
     implementation "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.11.1'
     def fragment_version = "1.6.2"

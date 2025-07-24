@@ -16,7 +16,6 @@ import androidx.health.connect.client.time.TimeRangeFilter
 import com.fasterxml.jackson.databind.ObjectMapper
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.ComponentActivity
-import io.flutter.plugin.common.PluginRegistry.Registrar
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -37,7 +36,7 @@ import kotlin.coroutines.CoroutineContext
 import android.os.Handler
 
 /** FlutterHealthConnectPlugin */
-public class FlutterHealthConnectPlugin(private var channel: MethodChannel? = null) : FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegistry.ActivityResultListener, Result {
+public class FlutterHealthConnectPlugin : FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegistry.ActivityResultListener, Result {
     private var job: Job = Job()
     var replyMapper: ObjectMapper = ObjectMapper()
     private var permissionResult: Result? = null
@@ -47,6 +46,7 @@ public class FlutterHealthConnectPlugin(private var channel: MethodChannel? = nu
     lateinit var scope: CoroutineScope
     private var handler: Handler? = null
     private lateinit var context: Context
+    private lateinit var channel: MethodChannel
 
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
@@ -57,17 +57,6 @@ public class FlutterHealthConnectPlugin(private var channel: MethodChannel? = nu
         context = flutterPluginBinding.applicationContext
         client = HealthConnectClient.getOrCreate(flutterPluginBinding.applicationContext)
         checkAvailability()
-    }
-
-     companion object {
-        @Suppress("unused")
-        @JvmStatic
-        fun registerWith(registrar: Registrar) {
-            val channel = MethodChannel(registrar.messenger(), "flutter_health_connect")
-            val plugin = FlutterHealthConnectPlugin(channel)
-            registrar.addActivityResultListener(plugin)
-            channel.setMethodCallHandler(plugin)
-        }
     }
 
     override fun success(p0: Any?) {
@@ -87,6 +76,7 @@ public class FlutterHealthConnectPlugin(private var channel: MethodChannel? = nu
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        channel.setMethodCallHandler(null)
         scope.cancel()
         currentActivity = null
     }
