@@ -13,6 +13,7 @@ import androidx.health.connect.client.request.ChangesTokenRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.time.TimeRangeFilter
+import androidx.health.connect.client.HealthConnectFeatures
 import com.fasterxml.jackson.databind.ObjectMapper
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.ComponentActivity
@@ -175,10 +176,28 @@ public class FlutterHealthConnectPlugin : FlutterPlugin, MethodCallHandler, Acti
             "hasPermissions" -> {
                 scope.launch {
                     val isReadOnly = call.argument<Boolean>("readOnly") ?: false
+                    val checkBackgroundPermission = call.argument<Boolean>("backgroundRead") ?: false
+
                     val granted = client.permissionController.getGrantedPermissions()
-                    val status =
-                        granted.containsAll(mapTypesToPermissions(requestedTypes, isReadOnly))
-                    result.success(status)
+                    val required = mapTypesToPermissions(requestedTypes, isReadOnly)
+
+                    val grantedTypes = granted.containsAll(required)
+
+                    var grantedBackground = true
+                    if (checkBackgroundPermission) {
+                         grantedBackground = granted.contains("android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND")
+                    }
+                    
+                    result.success(grantedTypes && grantedBackground)
+                }
+            }
+
+            "hasBackgroundPermission" -> {
+                scope.launch {
+                    val granted = client.permissionController.getGrantedPermissions()
+                    val grantedBackground = granted.contains("android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND")
+
+                    result.success(grantedBackground)
                 }
             }
 
@@ -190,7 +209,19 @@ public class FlutterHealthConnectPlugin : FlutterPlugin, MethodCallHandler, Acti
                         requestedTypes,
                         isReadOnly
                     )
+                    val backgroundRead = call.argument<Boolean>("backgroundRead") ?: false
 
+                    if (backgroundRead) {
+                        try {
+                            val status = client.features.getFeatureStatus(HealthConnectFeatures.FEATURE_READ_HEALTH_DATA_IN_BACKGROUND)
+                            if (status == HealthConnectFeatures.FEATURE_STATUS_AVAILABLE) {
+                                allPermissions.add("android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND")
+                                Log.i("", "Background read permission added to request")
+                            }
+                        } catch (e: Throwable) {
+                            Log.w("FLUTTER_HEALTH_CONNECT", "Error while checking background feature: ${e.message}")
+                        }
+                    }
                     if(healthConnectRequestPermissionsLauncher == null) {
                         result.success(false)
                         Log.e("FLUTTER_HEALTH_CONNECT", "Permission launcher not found")

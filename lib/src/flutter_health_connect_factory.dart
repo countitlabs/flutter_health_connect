@@ -18,20 +18,28 @@ class HealthConnectFactory {
   static Future<bool> hasPermissions(
     List<HealthConnectDataType> types, {
     bool readOnly = false,
+    bool backgroundRead = false,
   }) async {
     return await _channel.invokeMethod('hasPermissions', {
       'types': types.map((e) => e.name).toList(),
       'readOnly': readOnly,
+      'backgroundRead': backgroundRead,
     });
+  }
+
+  static Future<bool> hasBackgroundPermission() async {
+    return await _channel.invokeMethod('hasBackgroundPermission');
   }
 
   static Future<bool> requestPermissions(
     List<HealthConnectDataType> types, {
     bool readOnly = false,
+    bool backgroundRead = false,
   }) async {
     return await _channel.invokeMethod('requestPermissions', {
       'types': types.map((e) => e.name).toList(),
       'readOnly': readOnly,
+      'backgroundRead': backgroundRead,
     });
   }
 
