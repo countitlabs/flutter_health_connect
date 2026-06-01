@@ -12,6 +12,7 @@ import androidx.health.connect.client.changes.UpsertionChange
 import androidx.health.connect.client.request.ChangesTokenRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.request.AggregateRequest
+import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.time.TimeRangeFilter
 import androidx.health.connect.client.HealthConnectFeatures
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -315,10 +316,54 @@ public class FlutterHealthConnectPlugin : FlutterPlugin, MethodCallHandler, Acti
                                     ascendingOrder = ascendingOrder,
                                 )
                             )
+                            
+                            if (classType == ExerciseSessionRecord::class) {
+                                    val enrichedRecords = reply.records.map { rec ->
+                                    val record = rec as ExerciseSessionRecord
+
+                                    val aggregateData = client.aggregate(
+                                        AggregateRequest(
+                                            metrics = setOf(
+                                                ExerciseSessionRecord.EXERCISE_DURATION_TOTAL,
+                                            ),
+                                            timeRangeFilter = TimeRangeFilter.between(
+                                                record.startTime,
+                                                record.endTime,
+                                            ),
+                                            dataOriginFilter = setOf(record.metadata.dataOrigin),
+                                        )
+                                    )
+
+                                    val recordMap = replyMapper.convertValue(
+                                        record,
+                                        hashMapOf<String, Any?>()::class.java,
+                                    )
+
+                                    recordMap["duration"] =
+                                        aggregateData[ExerciseSessionRecord.EXERCISE_DURATION_TOTAL]
+                                            ?.seconds
+                                            ?.toDouble()
+                                            
+                                    recordMap["durationUnit"] = "seconds"
+
+                                    recordMap
+
+                                }
+
+                                val resultMap = replyMapper.convertValue(
+                                    reply,
+                                    hashMapOf<String, Any?>()::class.java,
+                                )
+
+                                resultMap["records"] = enrichedRecords
+
+                                result.success(resultMap)
+                                return@launch
+                            }
                             result.success(
                                 replyMapper.convertValue(
                                     reply,
-                                    hashMapOf<String, Any>()::class.java
+                                    hashMapOf<String, Any?>()::class.java
                                 )
                             )
                         } ?: throw Throwable("Unsupported type $type")
