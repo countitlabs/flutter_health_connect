@@ -344,7 +344,7 @@ public class FlutterHealthConnectPlugin : FlutterPlugin, MethodCallHandler, Acti
                                             ?.seconds
                                             ?.toDouble()
                                             
-                                    recordMap["durationUnit"] = "seconds"
+                                    recordMap["durationUnit"] = "second"
 
                                     recordMap
 
