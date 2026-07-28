@@ -104,8 +104,11 @@ fun mapTypesToPermissions(
 
 // List of all possible records: https://developer.android.com/reference/kotlin/androidx/health/connect/client/records/package-summary
 val HealthConnectAggregateMetricTypeMap = hashMapOf<String, AggregateMetric<*>>(
+    // ElevationGainedRecord
+    "ElevationGainedRecordElevationGainedTotal" to ElevationGainedRecord.ELEVATION_GAINED_TOTAL,
+    // SpeedRecord
+    "SpeedRecordSpeedAvg" to SpeedRecord.SPEED_AVG,
     // StepsRecord
     "StepsRecordCountTotal" to StepsRecord.COUNT_TOTAL,
 )
-
 

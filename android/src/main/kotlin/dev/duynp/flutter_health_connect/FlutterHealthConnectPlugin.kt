@@ -14,6 +14,8 @@ import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.time.TimeRangeFilter
+import androidx.health.connect.client.units.Length
+import androidx.health.connect.client.units.Velocity
 import androidx.health.connect.client.HealthConnectFeatures
 import com.fasterxml.jackson.databind.ObjectMapper
 import androidx.activity.result.ActivityResultLauncher
@@ -447,20 +449,24 @@ public class FlutterHealthConnectPlugin : FlutterPlugin, MethodCallHandler, Acti
                                 timeRangeFilter = TimeRangeFilter.between(start, end)
                             )
                         )
-                    val resultData = aggregationKeys.associateBy(
-                        {it},
-                        {
-                            replyMapper.convertValue(
-                                response[HealthConnectAggregateMetricTypeMap[it]!!],
-                                Double::class.java
-                            )
-                        }
-                    )
+                    val resultData = aggregationKeys.mapNotNull { key ->
+                        val metric = HealthConnectAggregateMetricTypeMap[key] ?: return@mapNotNull null
+                        aggregateValueAsDouble(response[metric])?.let { key to it }
+                    }.toMap()
                     result.success(resultData)
                 }
             } catch (e: Exception) {
                 result.error("AGGREGATE_FAIL", e.localizedMessage, e)
             }
+        }
+    }
+
+    private fun aggregateValueAsDouble(value: Any?): Double? {
+        return when (value) {
+            is Number -> value.toDouble()
+            is Length -> value.inMeters
+            is Velocity -> value.inMetersPerSecond
+            else -> replyMapper.convertValue(value, Double::class.java)
         }
     }
 }
