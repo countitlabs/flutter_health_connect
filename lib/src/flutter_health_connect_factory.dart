@@ -1,5 +1,12 @@
 part of flutter_health_connect;
 
+class HealthConnectAggregateResult {
+  final double value;
+  final String? unit;
+
+  const HealthConnectAggregateResult({required this.value, this.unit});
+}
+
 class HealthConnectFactory {
   static const MethodChannel _channel = MethodChannel('flutter_health_connect');
 
@@ -83,7 +90,7 @@ class HealthConnectFactory {
     return await _channel.invokeMethod('openHealthConnectSettings');
   }
 
-  static Future<Map<String, double>> aggregate({
+  static Future<Map<String, HealthConnectAggregateResult>> aggregate({
     required List<String> aggregationKeys,
     required DateTime startTime,
     required DateTime endTime,
@@ -98,9 +105,16 @@ class HealthConnectFactory {
       'startTime': start,
       'endTime': end,
     };
-    return await _channel
-        .invokeMethod('aggregate', args)
-        .then((value) => Map<String, double>.from(value));
+    return await _channel.invokeMethod('aggregate', args).then((value) {
+      final raw = Map<String, Object?>.from(value);
+      return raw.map((key, entry) {
+        final entryMap = Map<String, Object?>.from(entry as Map);
+        return MapEntry(
+          key,
+          HealthConnectAggregateResult(value: entryMap['value'] as double, unit: entryMap['unit'] as String?),
+        );
+      });
+    });
   }
   
   static Future<bool> disconnect() async {

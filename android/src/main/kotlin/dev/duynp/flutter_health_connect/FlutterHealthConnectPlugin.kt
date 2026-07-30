@@ -451,7 +451,9 @@ public class FlutterHealthConnectPlugin : FlutterPlugin, MethodCallHandler, Acti
                         )
                     val resultData = aggregationKeys.mapNotNull { key ->
                         val metric = HealthConnectAggregateMetricTypeMap[key] ?: return@mapNotNull null
-                        aggregateValueAsDouble(response[metric])?.let { key to it }
+                        val rawValue = response[metric]
+                        val doubleValue = aggregateValueAsDouble(rawValue) ?: return@mapNotNull null
+                        key to mapOf("value" to doubleValue, "unit" to aggregateValueUnit(rawValue))
                     }.toMap()
                     result.success(resultData)
                 }
@@ -467,6 +469,15 @@ public class FlutterHealthConnectPlugin : FlutterPlugin, MethodCallHandler, Acti
             is Length -> value.inMeters
             is Velocity -> value.inMetersPerSecond
             else -> replyMapper.convertValue(value, Double::class.java)
+        }
+    }
+
+    // The unit each accessor above converts to; keep this in sync with aggregateValueAsDouble.
+    private fun aggregateValueUnit(value: Any?): String? {
+        return when (value) {
+            is Length -> "meter"
+            is Velocity -> "meter_per_second"
+            else -> null
         }
     }
 }
