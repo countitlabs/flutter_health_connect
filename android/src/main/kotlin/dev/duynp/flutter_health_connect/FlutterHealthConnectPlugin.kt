@@ -13,6 +13,7 @@ import androidx.health.connect.client.request.ChangesTokenRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.records.ExerciseSessionRecord
+import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.time.TimeRangeFilter
 import androidx.health.connect.client.units.Length
 import androidx.health.connect.client.units.Velocity
@@ -51,6 +52,7 @@ public class FlutterHealthConnectPlugin : FlutterPlugin, MethodCallHandler, Acti
     private var handler: Handler? = null
     private lateinit var context: Context
     private lateinit var channel: MethodChannel
+    private lateinit var recordMetadataMapper: HealthConnectRecordMetadataMapper
 
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
@@ -59,6 +61,7 @@ public class FlutterHealthConnectPlugin : FlutterPlugin, MethodCallHandler, Acti
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "flutter_health_connect")
         channel?.setMethodCallHandler(this)
         context = flutterPluginBinding.applicationContext
+        recordMetadataMapper = HealthConnectRecordMetadataMapper(context)
         client = HealthConnectClient.getOrCreate(flutterPluginBinding.applicationContext)
         checkAvailability()
     }
@@ -247,16 +250,17 @@ public class FlutterHealthConnectPlugin : FlutterPlugin, MethodCallHandler, Acti
                         )
                         val typedChanges = changes.changes.mapIndexed { _, change ->
                             when (change) {
-                                is UpsertionChange -> hashMapOf(
-                                    change::class.simpleName to
-                                            hashMapOf(
-                                                change.record::class.simpleName to
-                                                        replyMapper.convertValue(
-                                                            change.record,
-                                                            hashMapOf<String, Any>()::class.java
-                                                        )
-                                            )
-                                )
+                                is UpsertionChange -> {
+                                    val recordMap = replyMapper.convertValue(
+                                        change.record,
+                                        hashMapOf<String, Any?>()::class.java,
+                                    )
+                                    recordMetadataMapper.enrich(change.record, recordMap)
+                                    hashMapOf(
+                                        change::class.simpleName to
+                                            hashMapOf(change.record::class.simpleName to recordMap)
+                                    )
+                                }
                                 else -> hashMapOf(
                                     change::class.simpleName to
                                             replyMapper.convertValue(
@@ -320,7 +324,7 @@ public class FlutterHealthConnectPlugin : FlutterPlugin, MethodCallHandler, Acti
                             )
                             
                             if (classType == ExerciseSessionRecord::class) {
-                                    val enrichedRecords = reply.records.map { rec ->
+                                val enrichedRecords = reply.records.map { rec ->
                                     val record = rec as ExerciseSessionRecord
 
                                     val aggregateData = client.aggregate(
@@ -348,6 +352,8 @@ public class FlutterHealthConnectPlugin : FlutterPlugin, MethodCallHandler, Acti
                                             
                                     recordMap["durationUnit"] = "second"
 
+                                    recordMetadataMapper.enrich(record, recordMap)
+
                                     recordMap
 
                                 }
@@ -362,12 +368,20 @@ public class FlutterHealthConnectPlugin : FlutterPlugin, MethodCallHandler, Acti
                                 result.success(resultMap)
                                 return@launch
                             }
-                            result.success(
-                                replyMapper.convertValue(
-                                    reply,
-                                    hashMapOf<String, Any?>()::class.java
+                            val enrichedRecords = reply.records.map { record ->
+                                val recordMap = replyMapper.convertValue(
+                                    record,
+                                    hashMapOf<String, Any?>()::class.java,
                                 )
+                                recordMetadataMapper.enrich(record as Record, recordMap)
+                                recordMap
+                            }
+                            val resultMap = replyMapper.convertValue(
+                                reply,
+                                hashMapOf<String, Any?>()::class.java,
                             )
+                            resultMap["records"] = enrichedRecords
+                            result.success(resultMap)
                         } ?: throw Throwable("Unsupported type $type")
                     } catch (e: Throwable) {
                         Log.e("FLUTTER_HEALTH_CONNECT", "Error getting record", e)
